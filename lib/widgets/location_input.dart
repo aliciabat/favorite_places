@@ -1,8 +1,14 @@
+import 'dart:convert';
+
+import 'package:favorite_places/models/place.dart';
 import 'package:location/location.dart';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 
 class LocationInput extends StatefulWidget {
-  const LocationInput({super.key});
+  const LocationInput({super.key, required this.onSelectLocation,});
+
+  final void Function(PlaceLocation location) onSelectLocation;
 
   @override
   State<StatefulWidget> createState() {
@@ -11,8 +17,9 @@ class LocationInput extends StatefulWidget {
 }
 
 class _LocationInputState extends State<LocationInput> {
-  Location? _pickedLocation;
+  PlaceLocation? _pickedLocation;
   var _isGettingLocation = false;
+  String text = 'No location chosen';
 
   void _getCurrentLocation() async {
     Location location = Location();
@@ -42,16 +49,37 @@ class _LocationInputState extends State<LocationInput> {
     });
 
     locationData = await location.getLocation();
+    final lat = locationData.latitude;
+    final lng = locationData.longitude;
+
+    if (lat == null || lng == null) {
+      return;
+    }
+
+    final url = Uri.parse(
+        'https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=$lat&longitude=$lng&localityLanguage=en');
+    final response = await http.get(url);
+    final resData = json.decode(response.body);
+    final address =
+        '${resData['locality']}, ${resData['principalSubdivision']}, ${resData['countryName']}';
 
     setState(() {
+      text = address;
+      _pickedLocation = PlaceLocation(
+        latitude: lat,
+        longitude: lng,
+        address: address,
+      );
       _isGettingLocation = false;
     });
+
+    widget.onSelectLocation(_pickedLocation!);
   }
 
   @override
   Widget build(BuildContext context) {
     Widget previewContent = Text(
-      'No location chosen',
+      text,
       textAlign: TextAlign.center,
       style: Theme.of(context).textTheme.bodyLarge!.copyWith(
             color: Theme.of(context).colorScheme.onBackground,
